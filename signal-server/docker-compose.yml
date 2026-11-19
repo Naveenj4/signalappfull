@@ -1,0 +1,104 @@
+version: '3.8'
+
+services:
+  mysql:
+    image: mysql:8.4
+    container_name: signal-mysql
+    restart: unless-stopped
+    command: >
+      --default-authentication-plugin=mysql_native_password
+      --character-set-server=utf8mb4
+      --collation-server=utf8mb4_unicode_ci
+      --innodb-buffer-pool-size=512M
+      --innodb-log-file-size=128M
+      --max-connections=200
+    environment:
+      MYSQL_ROOT_PASSWORD: root_db_secret_pass
+      MYSQL_DATABASE: signal
+      MYSQL_USER: signal
+      MYSQL_PASSWORD: signal_db_secret_pass
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./migrations/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "signal", "-psignal_db_secret_pass"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: signal-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --port 7000
+    ports:
+      - "7000:7000"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-p", "7000", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: signal-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio_signal_admin
+      MINIO_ROOT_PASSWORD: minio_signal_secret_pass
+    volumes:
+      - minio-data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  signal-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: signal-server
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    environment:
+      SIGNAL_DB_HOST: mysql
+      SIGNAL_DB_PORT: 3306
+      SIGNAL_DB_NAME: signal
+      SIGNAL_DB_USER: signal
+      SIGNAL_DB_PASSWORD: signal_db_secret_pass
+      SIGNAL_REDIS_HOST: redis
+      SIGNAL_REDIS_PORT: 7000
+      ADMIN_API_KEY: company_admin_secret_key_change_in_production
+      FIXED_TEST_VERIFICATION_CODE: "123456"
+      REQUIRE_ALLOWLIST: "true"
+      ATTACHMENT_UPLOAD_ALLOWLIST: "true"
+    volumes:
+      - ./config:/app/config:ro
+    ports:
+      - "8080:8080" # Signal Client REST & WebSocket API
+      - "8081:8081" # Dropwizard Admin & Metrics Port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8081/ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  mysql-data:
+  redis-data:
+  minio-data:

@@ -1,0 +1,21 @@
+/*
+ * Copyright 2023 Signal Messenger, LLC
+ * SPDX-License-Identifier: AGPL-3.0-only
+ */
+
+package org.whispersystems.textsecuregcm.storage;
+
+import java.time.Clock;
+import org.whispersystems.textsecuregcm.registration.VerificationSession;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+
+public class VerificationSessions extends SerializedExpireableJsonDynamoStore<VerificationSession> {
+
+  protected VerificationSessions() {
+    super(VerificationSession.class, Clock.systemUTC());
+  }
+
+  public VerificationSessions(final DynamoDbClient dynamoDbClient, final String tableName, final Clock clock) {
+    super(dynamoDbClient, tableName, clock);
+  }
+}

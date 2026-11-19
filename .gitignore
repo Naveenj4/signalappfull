@@ -1,0 +1,29 @@
+# Build outputs and caches
+**/build/
+**/.gradle/
+**/.gradle-home/
+**/.tmp/
+**/target/
+**/bin/
+**/out/
+*.class
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# Node dependencies
+**/node_modules/
+
+# Logs and databases
+*.log
+*.sqlite
+*.db
+hs_err_pid*
+
+# OS / IDE
+.idea/
+*.iml
+.vscode/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,291 @@
+logging:
+  level: INFO
+  appenders:
+    - type: console
+      threshold: ALL
+      timeZone: UTC
+      target: stdout
+
+tlsKeyStore:
+  password: secret://tlsKeyStore.password
+
+dynamoDbClient:
+  type: default
+  region: us-east-1
+  clientExecutionTimeout: PT30S
+  clientRequestTimeout: PT10S
+  maxConnections: 50
+
+database:
+  enabled: true
+  jdbcUrl: "jdbc:mysql://${SIGNAL_DB_HOST:-127.0.0.1}:${SIGNAL_DB_PORT:-3306}/${SIGNAL_DB_NAME:-signal}?useSSL=false&allowPublicKeyRetrieval=true&characterEncoding=UTF-8&rewriteBatchedStatements=true"
+  user: "${SIGNAL_DB_USER:-signal}"
+  password: "${SIGNAL_DB_PASSWORD:-signal_db_secret_pass}"
+  maxPoolSize: 20
+  minIdle: 5
+  runFlyway: true
+  registrationAllowlistOnly: false
+  fixedVerificationCodeEnabled: false
+  adminApiKey: "${SIGNAL_ADMIN_API_KEY:-signal-admin-secret}"
+  twilioAccountSid: "${TWILIO_ACCOUNT_SID:-}"
+  twilioAuthToken: "${TWILIO_AUTH_TOKEN:-}"
+  twilioFromNumber: "${TWILIO_FROM_NUMBER:-}"
+  smsWebhookUrl: "${SMS_WEBHOOK_URL:-}"
+
+dynamoDbTables:
+  accounts:
+    tableName: accounts_local
+    phoneNumberTableName: accounts_phonenumbers_local
+    phoneNumberIdentifierTableName: accounts_pni_local
+    usernamesTableName: accounts_usernames_local
+    usedLinkDeviceTokensTableName: accounts_used_link_tokens_local
+  appleDeviceChecks:
+    tableName: apple_device_checks_local
+  appleDeviceCheckPublicKeys:
+    tableName: apple_device_check_keys_local
+  backups:
+    tableName: backups_local
+  changeNumberWaitingPeriods:
+    tableName: change_number_waiting_periods_local
+  clientReleases:
+    tableName: client_releases_local
+  deletedAccounts:
+    tableName: deleted_accounts_local
+  deletedAccountsLock:
+    tableName: deleted_accounts_lock_local
+  donationPermits:
+    tableName: donation_permits_local
+    expiration: P7D
+  issuedReceipts:
+    tableName: issued_receipts_local
+    generator: abcdefg12345678=
+    maxReceiptsPerSubscriptionPayment:
+      STRIPE: 1
+      BRAINTREE: 1
+      GOOGLE_PLAY_BILLING: 1
+      APPLE_APP_STORE: 1
+  ecKeys:
+    tableName: keys_local
+  ecSignedPreKeys:
+    tableName: ec_signed_prekeys_local
+  pagedPqKeys:
+    tableName: paged_pq_keys_local
+  pqLastResortKeys:
+    tableName: pq_last_resort_keys_local
+  messages:
+    tableName: messages_local
+    expiration: P30D
+  onetimeDonations:
+    tableName: onetime_donations_local
+    expiration: P90D
+  phoneNumberIdentifiers:
+    tableName: phone_number_identifiers_local
+  profileAvatars:
+    tableName: profile_avatars_local
+  profiles:
+    tableName: profiles_local
+  profilesV2:
+    tableName: profiles_v2_local
+  pushChallenge:
+    tableName: push_challenge_local
+  redeemedReceipts:
+    tableName: redeemed_receipts_local
+  registrationRecovery:
+    tableName: registration_recovery_local
+    expiration: P300D
+  remoteConfig:
+    tableName: remote_config_local
+  reportMessage:
+    tableName: report_messages_local
+  sandboxAccounts:
+    tableName: sandbox_accounts_local
+  scheduledJobs:
+    tableName: scheduled_jobs_local
+    expiration: P7D
+  subscriptions:
+    tableName: subscriptions_local
+  verificationSessions:
+    tableName: verification_sessions_local
+
+pagedSingleUseKEMPreKeyStore:
+  bucket: prekey-bucket
+  region: us-east-1
+
+cacheCluster:
+  configurationUri: redis://127.0.0.1:6379/
+
+pubsub:
+  uri: redis://127.0.0.1:6379/
+
+pushSchedulerCluster:
+  configurationUri: redis://127.0.0.1:6379/
+
+rateLimitersCluster:
+  configurationUri: redis://127.0.0.1:6379/
+
+directoryV2:
+  client:
+    userAuthenticationTokenSharedSecret: secret://directoryV2.client.userAuthenticationTokenSharedSecret
+    userIdTokenSharedSecret: secret://directoryV2.client.userIdTokenSharedSecret
+
+svr2:
+  uri: 127.0.0.1:8080
+  userAuthenticationTokenSharedSecret: secret://svr2.userAuthenticationTokenSharedSecret
+  userIdTokenSharedSecret: secret://svr2.userIdTokenSharedSecret
+  svrCaCertificates: []
+
+svrb:
+  uri: 127.0.0.1:8080
+  userAuthenticationTokenSharedSecret: secret://svrb.userAuthenticationTokenSharedSecret
+  userIdTokenSharedSecret: secret://svrb.userIdTokenSharedSecret
+  svrCaCertificates: []
+
+attachments:
+  maxAttachmentUploadSizeInBytes: 104857600
+  maxMessageBackupUploadSizeInBytes: 104857600
+
+gcpAttachments:
+  domain: 127.0.0.1:9000
+  email: minio@example.com
+  pathPrefix: signal-attachments
+  rsaSigningKey: secret://gcpAttachments.rsaSigningKey
+
+tus:
+  uploadUri: http://127.0.0.1:9000/upload
+  userAuthenticationTokenSharedSecret: secret://tus.userAuthenticationTokenSharedSecret
+
+apn:
+  sandbox: true
+  bundleId: com.example.textsecuregcm
+  keyId: secret://apn.keyId
+  teamId: secret://apn.teamId
+  signingKey: secret://apn.signingKey
+
+fcm:
+  credentials: secret://fcm.credentials
+
+cdn:
+  bucket: cdn
+  credentials:
+    accessKeyId: secret://cdn.accessKey
+    secretAccessKey: secret://cdn.accessSecret
+  region: us-east-1
+
+cdn3StorageManager:
+  baseUri: http://127.0.0.1:9000
+  clientId: example
+  clientSecret: secret://cdn3StorageManager.clientSecret
+  sourceSchemes:
+    2: gcs
+    3: r2
+
+openTelemetry:
+  enabled: false
+  environment: dev
+  url: http://127.0.0.1:4318/
+
+unidentifiedDelivery:
+  certificate: CgIIAQ==
+  privateKey: secret://unidentifiedDelivery.privateKey
+  expiresDays: 365
+  embedSigner: true
+
+shortCode:
+  baseUrl: http://127.0.0.1:8080/shortcodes/
+
+storageService:
+  uri: 127.0.0.1:8080
+  userAuthenticationTokenSharedSecret: secret://storageService.userAuthenticationTokenSharedSecret
+  storageCaCertificates: []
+
+callingZkConfigPreV101:
+  serverSecret: secret://callingZkConfigPreV101.serverSecret
+
+callingZkConfig:
+  serverSecret: secret://callingZkConfigV101.serverSecret
+
+chatZkConfig:
+  serverSecret: secret://chatZkConfig.serverSecret
+
+groupsZkConfig:
+  serverPublic: Bci2b3tNq5P+zY+z1t7Fv4/0f/9e7R+GgK7U1wX+4T2Y8n5K6v1O2P3Q4R5S6T7U8V9W0X1Y2Z3a4b5c6d7e8f9g0h1i2j3k4l5m6n7o8p9q0r1s2t3u4v5w6x7y8z9A0B1C2D3E4F5G6H7I8J9K0L1M2N3O4P5Q6R7S8T9U0V1W2X3Y4Z5a6b7c8d9e0f1g2h3i4j5k6l7m8n9o0p1q2r3s4t5u6v7w8x9y0z1A2B3C4D5E6F7G8H9I0J1K2L3M4N5O6P7Q8R9S0T1U2V3W4X5Y6Z7a8b9c0d1e2f3g4h5i6j7k8l9m0n1o2p3q4r5s6t7u8v9w0x1y2z==
+  serverSecret: secret://zkConfig-libsignal-0.42.serverSecret
+
+dynamicConfig:
+  s3Region: us-east-1
+  s3Bucket: dynamic-config
+  objectKey: dynamic-config.yaml
+  maxSize: 100000
+  refreshInterval: PT10S
+
+remoteConfig:
+  globalConfig:
+    EXAMPLE_KEY: VALUE
+
+paymentsService:
+  userAuthenticationTokenSharedSecret: secret://paymentsService.userAuthenticationTokenSharedSecret
+  paymentCurrencies:
+    - MOB
+  externalClients:
+    fixerApiKey: secret://paymentsService.fixerApiKey
+    coinGeckoApiKey: secret://paymentsService.coinGeckoApiKey
+    coinGeckoCurrencyIds:
+      MOB: mobilecoin
+
+registrationService:
+  type: stub
+  collationKeySalt: secret://registrationService.collationKeySalt
+  registrationCaCertificate: |
+    -----BEGIN CERTIFICATE-----
+    MIIDazCCAlOgAwIBAgIUW5lcNWkuynRVc8Rq5pO6mHQBuZAwDQYJKoZIhvcNAQEL
+    BQAwRTELMAkGA1UEBhMCQVUxEzARBgNVBAgMClNvbWUtU3RhdGUxITAfBgNVBAoM
+    GEludGVybmV0IFdpZGdpdHMgUHR5IEx0ZDAeFw0yNDAzMjUwMzE4MTNaFw0yOTAz
+    MjUwMzE4MTNaMEUxCzAJBgNVBAYTAkFVMRMwEQYDVQQIDApTb21lLVN0YXRlMSEw
+    HwYDVQQKDBhJbnRlcm5ldCBXaWRnaXRzIFB0eSBMdGQwggEiMA0GCSqGSIb3DQEB
+    AQUAA4IBDwAwggEKAoIBAQC7+5f24F4RzF8d5a1b5c4e3f2a1b0c9d8e7f6a5b4c
+    3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e
+    1f0a9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a
+    9b8c7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c
+    7d6e5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4c3d2e1f0a9b8c7d6e
+    5f4a3b2c1d0e9f8a7b6c5d4e3f2a1b0c9d8e7f6a5b4cAgMBAAEwDQYJKoZIhvcN
+    AQELBQADggEBABe9f...
+    -----END CERTIFICATE-----
+
+linkDevice:
+  secret: secret://linkDevice.secret
+
+externalRequestFilter:
+  grpcMethods: []
+  paths: []
+  permittedInternalRanges:
+    - 127.0.0.0/8
+
+idlePrimaryDeviceReminder:
+  minIdleDuration: P30D
+
+grpc:
+  port: 50051
+  websocketPort: 8080
+
+foundationDbMessages:
+  maxWatchesPerClient: 10000
+  transactionTimeout: PT1S
+  transactionRetryLimit: 3
+  batchPriorityTransactionTimeout: PT5S
+  batchPriorityTransactionRetryLimit: 10
+  versionstampCipherKeys:
+    0: secret://foundationDbMessages.versionstampCipherKey.0
+  currentVersionstampCipherKey: 0
+  clusters:
+    "messages-0":
+      type: local
+  epochs:
+    0:
+      - messages-0
+
+registrationWebAuthn:
+  relyingPartyId: example.org
+  origins:
+    - https://example.org
+  challengeTtl: PT2M
+  userHandleBlindingSecret: secret://registrationWebAuthn.userHandleBlindingSecret

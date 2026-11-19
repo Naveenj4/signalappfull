@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "621202156060",
+    "project_id": "signalapp-84c12",
+    "storage_bucket": "signalapp-84c12.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:621202156060:android:4f52da378007d458958dd9",
+        "android_client_info": {
+          "package_name": "com.mycompany.securechat"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyC2vCtAIx6V2d1d0MS4P5bZx4Gm5dTPUME"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

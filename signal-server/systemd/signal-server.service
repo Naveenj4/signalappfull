@@ -1,0 +1,26 @@
+[Unit]
+Description=Signal Server (MySQL/MariaDB Edition)
+Documentation=https://github.com/signalapp/Signal-Server
+After=network.target mariadb.service mysql.service redis-server.service minio.service
+Wants=mariadb.service redis-server.service minio.service
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/signal-server
+EnvironmentFile=-/opt/signal-server/.env
+ExecStart=/usr/bin/java \
+    -Xms1g \
+    -Xmx2g \
+    -XX:+UseG1GC \
+    -Dsecrets.bundle.filename=/opt/signal-server/secrets.bundle.yml \
+    -jar /opt/signal-server/whisper-server.jar server /opt/signal-server/production.yml
+Restart=always
+RestartSec=10
+LimitNOFILE=65536
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=signal-server
+
+[Install]
+WantedBy=multi-user.target

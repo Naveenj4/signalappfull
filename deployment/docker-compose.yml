@@ -1,0 +1,65 @@
+version: '3.8'
+
+services:
+  # ----------------------------------------------------------------------------
+  # Redis 7: Ephemeral Presence & WebSocket Pub/Sub Dispatch
+  # ----------------------------------------------------------------------------
+  redis:
+    image: redis:7.4-alpine
+    container_name: pit-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: ["redis-server", "--appendonly", "no", "--save", ""]
+    volumes:
+      - ./data/redis:/data
+    networks:
+      - pit-network
+
+  # ----------------------------------------------------------------------------
+  # MinIO: S3-Compatible Storage for Encrypted Attachments & Avatars
+  # ----------------------------------------------------------------------------
+  minio:
+    image: minio/minio:RELEASE.2024-05-10T01-41-38Z
+    container_name: pit-minio
+    restart: unless-stopped
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: "pitadmin"
+      MINIO_ROOT_PASSWORD: "pitpassword123!"
+    command: server /data --console-address ":9001"
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - pit-network
+
+  # ----------------------------------------------------------------------------
+  # MySQL 8.0: Primary Relational Engine (Containerized Alternative to XAMPP)
+  # ----------------------------------------------------------------------------
+  mysql:
+    image: mysql:8.0
+    container_name: pit-mysql
+    restart: unless-stopped
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: "pitrootpassword!"
+      MYSQL_DATABASE: "pit_messenger"
+      MYSQL_USER: "pituser"
+      MYSQL_PASSWORD: "pituserpassword!"
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --default-authentication-plugin=mysql_native_password
+    volumes:
+      - ./data/mysql:/var/lib/mysql
+      - ../database-migration/schema/01_init_pit_messenger_schema.sql:/docker-entrypoint-initdb.d/01_init.sql:ro
+    networks:
+      - pit-network
+
+networks:
+  pit-network:
+    name: pit-network
+    driver: bridge
