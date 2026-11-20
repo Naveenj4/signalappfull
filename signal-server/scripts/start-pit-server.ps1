@@ -3,11 +3,11 @@
 # ==============================================================================
 
 param(
-  [string] $DatabaseHost = "127.0.0.1",
-  [int] $DatabasePort = 3306,
-  [string] $DatabaseName = "pit_messenger",
-  [string] $DatabaseUser = "pituser",
-  [string] $DatabasePassword = "pitpassword!"
+  [string] $DatabaseHost = "",
+  [int] $DatabasePort = 0,
+  [string] $DatabaseName = "",
+  [string] $DatabaseUser = "",
+  [string] $DatabasePassword = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -36,25 +36,48 @@ Write-Host " Starting PIT Messenger Server Stack" -ForegroundColor Cyan
 Write-Host "==========================================================" -ForegroundColor Cyan
 
 # 1. Environment Variables
+foreach ($envFile in @(
+  (Join-Path $serverRoot "config\pit_messenger.local.env"),
+  (Join-Path $serverRoot "config\pit-server.env")
+)) {
+  if (Test-Path $envFile) {
+    Write-Host "--> Loading environment config from $envFile..." -ForegroundColor Yellow
+    Get-Content $envFile | ForEach-Object {
+      $line = $_.Trim()
+      if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
+        $parts = $line.Split("=", 2)
+        $key = $parts[0].Trim()
+        $val = $parts[1].Trim()
+        [System.Environment]::SetEnvironmentVariable($key, $val, "Process")
+      }
+    }
+  }
+}
+
+if ([string]::IsNullOrWhiteSpace($DatabaseHost)) {
+  $DatabaseHost = if ($env:SIGNAL_DB_HOST) { $env:SIGNAL_DB_HOST } else { "127.0.0.1" }
+}
+if ($DatabasePort -le 0) {
+  $DatabasePort = if ($env:SIGNAL_DB_PORT) { [int]$env:SIGNAL_DB_PORT } else { 3306 }
+}
+if ([string]::IsNullOrWhiteSpace($DatabaseName)) {
+  $DatabaseName = if ($env:SIGNAL_DB_NAME) { $env:SIGNAL_DB_NAME } else { "pit_messenger" }
+}
+if ([string]::IsNullOrWhiteSpace($DatabaseUser)) {
+  $DatabaseUser = if ($env:SIGNAL_DB_USER) { $env:SIGNAL_DB_USER } else { "pituser" }
+}
+if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
+  $DatabasePassword = $env:SIGNAL_DB_PASSWORD
+}
+if ([string]::IsNullOrWhiteSpace($DatabasePassword)) {
+  throw "Set SIGNAL_DB_PASSWORD in config\pit_messenger.local.env or pass -DatabasePassword."
+}
+
 $env:SIGNAL_DB_HOST = $DatabaseHost
 $env:SIGNAL_DB_PORT = "$DatabasePort"
 $env:SIGNAL_DB_NAME = $DatabaseName
 $env:SIGNAL_DB_USER = $DatabaseUser
 $env:SIGNAL_DB_PASSWORD = $DatabasePassword
-
-$envFile = Join-Path $serverRoot "config\pit-server.env"
-if (Test-Path $envFile) {
-  Write-Host "--> Loading environment config from $envFile..." -ForegroundColor Yellow
-  Get-Content $envFile | ForEach-Object {
-    $line = $_.Trim()
-    if ($line -and -not $line.StartsWith("#") -and $line.Contains("=")) {
-      $parts = $line.Split("=", 2)
-      $key = $parts[0].Trim()
-      $val = $parts[1].Trim()
-      [System.Environment]::SetEnvironmentVariable($key, $val, "Process")
-    }
-  }
-}
 
 # 2. Check Redis
 $redisRunning = Test-PortOpen "127.0.0.1" 6379
@@ -102,8 +125,11 @@ if (Test-Path $mysqlCli) {
 }
 
 # 4. Locate Shaded Jar
-$jarPath = Join-Path $serverRoot "service\target\TextSecureServer-20261104.0.1-dirty-SNAPSHOT.jar"
-if (-not (Test-Path $jarPath)) {
+$jarPath = Get-ChildItem (Join-Path $serverRoot "service\target") -Filter "TextSecureServer-*.jar" |
+  Where-Object { $_.Name -notlike "original-*" } |
+  Sort-Object LastWriteTime -Descending |
+  Select-Object -First 1
+if (-not $jarPath) {
   Write-Error "Server JAR not found at $jarPath. Build with .\mvnw.cmd package -Dmaven.test.skip=true -pl :websocket-resources,:service"
   exit 1
 }
@@ -113,4 +139,4 @@ $secretsBundle = Join-Path $serverRoot "config\secrets.bundle.yml"
 $configFile = Join-Path $serverRoot "config\local.yml"
 
 Write-Host "--> Launching TextSecureServer on port 8080 (Admin: 8081)..." -ForegroundColor Cyan
-java "-Dsecrets.bundle.filename=$secretsBundle" -jar "$jarPath" server "$configFile"
+java "-Dsecrets.bundle.filename=$secretsBundle" -jar "$($jarPath.FullName)" server "$configFile"

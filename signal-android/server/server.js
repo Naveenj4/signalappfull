@@ -2,6 +2,7 @@ const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const mysql = require('mysql2/promise');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 
@@ -23,15 +24,16 @@ if (fs.existsSync(envPath)) {
 const DB_CONFIG = {
   host: process.env.DB_HOST || '127.0.0.1',
   port: parseInt(process.env.DB_PORT || '3306', 10),
-  user: process.env.DB_USER || 'root',
+  user: process.env.DB_USER || '',
   password: process.env.DB_PASSWORD || '',
-  database: process.env.DB_NAME || 'company_messaging',
+  database: process.env.DB_NAME || 'pit_messenger',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 };
 
 const PORT = parseInt(process.env.SERVER_PORT || '8080', 10);
+const SERVER_URL = (process.env.SERVER_URL || `http://127.0.0.1:${PORT}`).replace(/\/$/, '');
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -42,23 +44,37 @@ app.use((err, req, res, next) => {
 
 let dbPool = null;
 let isUsingInMemoryFallback = false;
+const verificationSessions = new Map();
+const OTP_BACKEND_URL = (process.env.OTP_BACKEND_URL || 'http://127.0.0.1:8088').replace(/\/$/, '');
+
+function basicAuthNumber(req) {
+  const header = req.headers.authorization;
+  if (!header?.startsWith('Basic ')) return null;
+  try {
+    const decoded = Buffer.from(header.substring(6), 'base64').toString('utf8');
+    const separator = decoded.indexOf(':');
+    return separator >= 0 ? decoded.substring(0, separator) : null;
+  } catch {
+    return null;
+  }
+}
+
+function sessionResponse(session) {
+  return {
+    id: session.id,
+    nextSms: 0,
+    nextCall: 0,
+    nextVerificationAttempt: 0,
+    allowedToRequestCode: !session.verified,
+    requestedInformation: [],
+    verified: session.verified
+  };
+}
 
 async function initDatabase() {
   try {
     console.log(`[MySQL] Attempting connection to MySQL at ${DB_CONFIG.host}:${DB_CONFIG.port} (user: '${DB_CONFIG.user}')...`);
     
-    // Connect to server (to create DB if needed)
-    const rootConn = await mysql.createConnection({
-      host: DB_CONFIG.host,
-      port: DB_CONFIG.port,
-      user: DB_CONFIG.user,
-      password: DB_CONFIG.password,
-      connectTimeout: 3000
-    });
-
-    await rootConn.query(`CREATE DATABASE IF NOT EXISTS \`${DB_CONFIG.database}\`;`);
-    await rootConn.end();
-
     dbPool = mysql.createPool(DB_CONFIG);
 
     console.log(`[MySQL] Initializing tables in database '${DB_CONFIG.database}'...`);
@@ -166,7 +182,7 @@ app.get('/', async (req, res) => {
         <div class="info">
           <div><b>Database:</b> ${DB_CONFIG.database}</div>
           <div><b>MySQL Status:</b> ${mysqlStatus}</div>
-          <div><b>Server IP:</b> 10.141.154.91:8080</div>
+          <div><b>Server URL:</b> ${SERVER_URL}</div>
         </div>
 
         <div class="btn-group">
@@ -232,74 +248,85 @@ app.use((req, res, next) => {
 
 // Accounts & Verification API V2
 app.post('/v1/verification/session', (req, res) => {
-  const number = req.body?.number || '+10000000000';
-  const sessionId = 'session-' + Date.now();
+  const number = req.body?.number;
+  if (!number || typeof number !== 'string') {
+    return res.status(422).json({ error: 'A valid E.164 number is required' });
+  }
+  const sessionId = 'session-' + crypto.randomUUID();
+  const session = { id: sessionId, number, verified: false, codeRequested: false };
+  verificationSessions.set(sessionId, session);
   console.log(`[Registration] Verification session created for ${number}, session: ${sessionId}`);
-  res.json({
-    id: sessionId,
-    nextSms: 0,
-    nextCall: 0,
-    nextVerificationAttempt: 0,
-    allowedToRequestCode: true,
-    requestedInformation: [],
-    verified: false
-  });
+  res.json(sessionResponse(session));
 });
 
 app.get('/v1/verification/session/:sessionId', (req, res) => {
-  res.json({
-    id: req.params.sessionId,
-    nextSms: 0,
-    nextCall: 0,
-    nextVerificationAttempt: 0,
-    allowedToRequestCode: true,
-    requestedInformation: [],
-    verified: false
-  });
+  const session = verificationSessions.get(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(sessionResponse(session));
 });
 
 app.patch('/v1/verification/session/:sessionId', (req, res) => {
-  res.json({
-    id: req.params.sessionId,
-    nextSms: 0,
-    nextCall: 0,
-    nextVerificationAttempt: 0,
-    allowedToRequestCode: true,
-    requestedInformation: [],
-    verified: false
-  });
+  const session = verificationSessions.get(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  res.json(sessionResponse(session));
 });
 
 app.post('/v1/verification/session/:sessionId/code', (req, res) => {
-  console.log(`[Registration] Code requested for session ${req.params.sessionId}. Auto-code: 123456`);
-  res.json({
-    id: req.params.sessionId,
-    nextSms: 0,
-    nextCall: 0,
-    nextVerificationAttempt: 0,
-    allowedToRequestCode: true,
-    requestedInformation: [],
-    verified: false
+  const session = verificationSessions.get(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  fetch(`${OTP_BACKEND_URL}/v1/registration/request-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ e164: session.number, transport: 'sms' }),
+    signal: AbortSignal.timeout(20000)
+  }).then(async providerResponse => {
+    const body = await providerResponse.json();
+    if (!providerResponse.ok) {
+      console.error('[Registration] Real OTP request failed:', body);
+      return res.status(providerResponse.status).json(body);
+    }
+    session.codeRequested = true;
+    session.otpSessionId = body.session_id;
+    console.log(`[Registration] Real OTP requested for ${session.number}`);
+    res.json(sessionResponse(session));
+  }).catch(err => {
+    console.error('[Registration] OTP backend unavailable:', err.message);
+    res.status(502).json({ error: 'OTP backend unavailable' });
   });
 });
 
 app.put('/v1/verification/session/:sessionId/code', (req, res) => {
-  console.log(`[Registration] Code accepted for session ${req.params.sessionId}`);
-  res.json({
-    id: req.params.sessionId,
-    nextSms: 0,
-    nextCall: 0,
-    nextVerificationAttempt: 0,
-    allowedToRequestCode: true,
-    requestedInformation: [],
-    verified: true
+  const session = verificationSessions.get(req.params.sessionId);
+  if (!session) return res.status(404).json({ error: 'Session not found' });
+  if (!session.codeRequested || !session.otpSessionId) return res.status(409).json(sessionResponse(session));
+  fetch(`${OTP_BACKEND_URL}/v1/registration/verify-code`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: session.otpSessionId, code: req.body?.code }),
+    signal: AbortSignal.timeout(15000)
+  }).then(async providerResponse => {
+    const body = await providerResponse.json();
+    if (!providerResponse.ok) {
+      return res.status(providerResponse.status).json(body);
+    }
+    session.verified = true;
+    console.log(`[Registration] Real OTP accepted for session ${req.params.sessionId}`);
+    res.json(sessionResponse(session));
+  }).catch(err => {
+    console.error('[Registration] OTP verification unavailable:', err.message);
+    res.status(502).json({ error: 'OTP backend unavailable' });
   });
 });
 
 app.post('/v1/registration', async (req, res) => {
   const aci = '4f553a1e-8bc7-4348-9f1c-' + Math.random().toString(16).substring(2, 14);
   const pni = '0d3c01c7-0fae-4d43-a60d-' + Math.random().toString(16).substring(2, 14);
-  const e164 = req.body?.e164 || null;
+  const session = req.body?.sessionId ? verificationSessions.get(req.body.sessionId) : null;
+  const e164 = session?.verified ? session.number : basicAuthNumber(req);
+
+  if (req.body?.sessionId && !session?.verified) {
+    return res.status(401).json({ error: 'Session not found or not verified' });
+  }
   console.log(`[Registration] Registering account: aci=${aci}, number=${e164}`);
 
   if (dbPool) {
@@ -389,7 +416,7 @@ app.get('/v4/attachments/form/upload', (req, res) => {
     cdn: 0,
     key: attachmentId,
     headers: {},
-    signedUploadLocation: `http://10.141.154.91:8080/v4/attachments/upload/${attachmentId}`
+    signedUploadLocation: `${SERVER_URL}/v4/attachments/upload/${attachmentId}`
   });
 });
 

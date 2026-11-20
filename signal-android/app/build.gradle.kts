@@ -264,7 +264,9 @@ android {
 
     buildConfigField("long", "BUILD_TIMESTAMP", getLastCommitTimestamp() + "L")
     buildConfigField("String", "GIT_HASH", "\"${getGitHash()}\"")
-    val CUSTOM_SERVER_URL = "http://10.141.154.91:8080"
+    val CUSTOM_SERVER_URL = (System.getenv("CUSTOM_SERVER_URL")?.takeIf { it.isNotBlank() }
+      ?: providers.gradleProperty("CUSTOM_SERVER_URL").orNull?.takeIf { it.isNotBlank() }
+      ?: "http://10.0.2.2:8080")
     buildConfigField("String", "SIGNAL_URL", "\"$CUSTOM_SERVER_URL\"")
     buildConfigField("String", "STORAGE_URL", "\"$CUSTOM_SERVER_URL\"")
     buildConfigField("String", "SIGNAL_CDN_URL", "\"$CUSTOM_SERVER_URL\"")

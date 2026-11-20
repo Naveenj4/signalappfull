@@ -4,7 +4,7 @@ echo ============================================================
 echo   PIT Messenger - Stopping Server Stack
 echo ============================================================
 
-echo Stopping Signal Server (port 8080)...
+echo Stopping Signal Java server (port 8080)...
 for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":8080 " ^| findstr "LISTENING"') do (
     taskkill /PID %%a /F >nul 2>&1
 )

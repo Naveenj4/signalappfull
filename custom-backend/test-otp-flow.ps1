@@ -13,10 +13,15 @@ Write-Host "=== 2. Requesting OTP for $PhoneNumber ===" -ForegroundColor Cyan
 $body = @{ e164 = $PhoneNumber; transport = "sms" } | ConvertTo-Json
 $otp = Invoke-RestMethod -Uri "$baseUrl/v1/registration/request-code" -Method Post -Body $body -ContentType "application/json"
 Write-Host "Session Created: $($otp.session_id)" -ForegroundColor Green
-Write-Host "Received OTP Code (Dev): $($otp.dev_code)" -ForegroundColor Yellow
+if ($otp.dev_code) {
+  Write-Host "Development code returned by server: $($otp.dev_code)" -ForegroundColor Yellow
+} else {
+  Write-Host "A real SMS/OTP was requested; enter the code received on the phone." -ForegroundColor Yellow
+}
 
 Write-Host "=== 3. Submitting Verification Code ===" -ForegroundColor Cyan
-$verifyBody = @{ session_id = $otp.session_id; code = $otp.dev_code } | ConvertTo-Json
+$code = Read-Host "Enter the OTP received on $PhoneNumber"
+$verifyBody = @{ session_id = $otp.session_id; code = $code } | ConvertTo-Json
 $verify = Invoke-RestMethod -Uri "$baseUrl/v1/registration/verify-code" -Method Post -Body $verifyBody -ContentType "application/json"
 Write-Host "Verified: $($verify.verified)" -ForegroundColor Green
 Write-Host "Verification Token Issued: $($verify.verification_token)" -ForegroundColor Green

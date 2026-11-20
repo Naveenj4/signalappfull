@@ -11,6 +11,9 @@
 *.aab
 *.ap_
 *.dex
+.git_backup/
+**/.git_backup/
+**/.git_backup/**
 
 # Node dependencies
 **/node_modules/
@@ -20,6 +23,15 @@
 *.sqlite
 *.db
 hs_err_pid*
+dump.rdb
+nodes-6379.conf
+
+# Local environment and secret files
+**/.env
+**/*.local.env
+signal-server/config/pit-server.env
+signal-server/config/secrets.bundle.yml
+signal-android/server/config.env
 
 # OS / IDE
 .idea/

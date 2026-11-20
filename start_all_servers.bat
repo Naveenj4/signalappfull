@@ -7,7 +7,7 @@ echo ============================================================
 cd /d "%~dp0"
 
 :: 1. Check Redis
-echo [1/4] Checking Redis on port 6379...
+echo [1/3] Checking Redis on port 6379...
 netstat -ano | findstr ":6379 " >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     echo       Redis is active on port 6379.
@@ -23,7 +23,7 @@ if %ERRORLEVEL% equ 0 (
 )
 
 :: 2. Check MySQL
-echo [2/4] Checking MySQL on port 3306...
+echo [2/3] Checking MySQL on port 3306...
 netstat -ano | findstr ":3306 " >nul 2>&1
 if %ERRORLEVEL% equ 0 (
     echo       MySQL is reachable on port 3306.
@@ -31,17 +31,12 @@ if %ERRORLEVEL% equ 0 (
     echo       [WARNING] Port 3306 is not listening! Please start your MySQL service.
 )
 
-:: 3. Start Custom Backend (Node.js) on port 8088
-echo [3/4] Starting Custom Backend microservice on port 8088...
-start "PIT Custom Backend (Port 8088)" cmd /k "cd /d %~dp0custom-backend && node server.js"
-
-:: 4. Start Signal Server (Java Dropwizard) on port 8080/8081
-echo [4/4] Starting Signal Server (Dropwizard) on port 8080/8081...
+:: 3. Start the official Signal Java server on port 8080/8081
+echo [3/3] Starting the official Signal Java server...
 start "PIT Signal Server (Port 8080/8081)" powershell -NoExit -ExecutionPolicy Bypass -File "%~dp0signal-server\scripts\start-pit-server.ps1"
 
 echo ============================================================
 echo   Server stack launched!
-echo   - Custom Backend:  http://127.0.0.1:8088
 echo   - Signal Server:   http://127.0.0.1:8080
 echo   - Admin / Health:  http://127.0.0.1:8081/healthcheck
 echo ============================================================
